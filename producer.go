@@ -52,8 +52,9 @@ func (p *Producer) Start() {
 }
 
 //Stop stop Producer
-func (p *Producer) Stop() {
-	p.Close()
+func (p *Producer) Stop() error {
+	p.notifyQuit()
+	return p.Close()
 }
 
 func (p *Producer) reconnect() error {

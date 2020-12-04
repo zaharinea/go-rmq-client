@@ -54,8 +54,6 @@ func (c *Connection) setupChanels() error {
 
 //Close close connection
 func (c *Connection) Close() error {
-	c.notifyQuit()
-
 	err := c.channel.Close()
 	if err != nil {
 		return err

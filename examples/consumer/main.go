@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
@@ -14,6 +15,7 @@ import (
 
 func handler(ctx context.Context, msg amqp.Delivery) bool {
 	fmt.Printf("event: msg=%s\n", string(msg.Body))
+	time.Sleep(time.Second * 3)
 	return true
 }
 

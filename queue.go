@@ -30,9 +30,6 @@ type Queue struct {
 
 // NewQueue returns a new Queue struct
 func NewQueue(name string, routingKey string, arguments amqp.Table) *Queue {
-	countWorkers := defaultCountWorkers
-	multiplier := defaultMultiplier
-	prefetchCount := countWorkers * multiplier
 	deliveries := make(chan amqp.Delivery)
 	return &Queue{
 		Name:          name,
@@ -43,9 +40,9 @@ func NewQueue(name string, routingKey string, arguments amqp.Table) *Queue {
 		NoWait:        false,
 		Arguments:     arguments,
 		requeue:       false,
-		prefetchCount: prefetchCount,
+		prefetchCount: defaultCountWorkers * defaultMultiplier,
 		deliveries:    deliveries,
-		countWorkers:  countWorkers,
+		countWorkers:  defaultCountWorkers,
 	}
 }
 
@@ -61,9 +58,16 @@ func (q *Queue) SetRequeue(value bool) *Queue {
 	return q
 }
 
-// SetCountWorkers set requeue param
+// SetCountWorkers set count of workers
 func (q *Queue) SetCountWorkers(value int) *Queue {
 	q.countWorkers = value
+	q.prefetchCount = value * defaultMultiplier
+	return q
+}
+
+// SetPrefetchCount set prefetch count
+func (q *Queue) SetPrefetchCount(value int) *Queue {
+	q.prefetchCount = value
 	return q
 }
 

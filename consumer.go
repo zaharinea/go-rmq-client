@@ -3,6 +3,7 @@ package rmqclient
 import (
 	"context"
 	"fmt"
+	"sync"
 )
 
 // Consumer struct
@@ -10,6 +11,7 @@ type Consumer struct {
 	Connection
 	queues    map[string]*Queue
 	exchanges map[string]*Exchange
+	wg        *sync.WaitGroup
 }
 
 // NewConsumer returns a new Consumer struct
@@ -18,6 +20,7 @@ func NewConsumer(uri string, logger Logger) *Consumer {
 	queues := make(map[string]*Queue)
 	err := make(chan error)
 	ctx, cancel := context.WithCancel(context.Background())
+	wg := &sync.WaitGroup{}
 	return &Consumer{
 		exchanges: exchanges,
 		queues:    queues,
@@ -29,6 +32,7 @@ func NewConsumer(uri string, logger Logger) *Consumer {
 			reconnectTimeout: reconnectTimeout,
 			logger:           logger,
 		},
+		wg: wg,
 	}
 }
 
@@ -61,8 +65,10 @@ func (c *Consumer) Start() {
 }
 
 //Stop stop Consumer
-func (c *Consumer) Stop() {
-	c.Close()
+func (c *Consumer) Stop() error {
+	c.notifyQuit()
+	c.wg.Wait()
+	return c.Close()
 }
 
 //RegisterQueue register queue
@@ -134,7 +140,8 @@ func (c *Consumer) consume() error {
 			return err
 		}
 		for i := 0; i < queue.countWorkers; i++ {
-			go c.consumeHandler(queue, i)
+			c.wg.Add(1)
+			go c.consumeWorker(queue, i)
 		}
 	}
 
@@ -173,7 +180,9 @@ func (c *Consumer) reconsume() error {
 	return nil
 }
 
-func (c *Consumer) consumeHandler(queue *Queue, workerNumber int) {
+func (c *Consumer) consumeWorker(queue *Queue, workerNumber int) {
+	defer c.wg.Done()
+
 	c.logger.Debugf("Start process events: queue=%s, worker=%d", queue.Name, workerNumber)
 	for {
 		select {
