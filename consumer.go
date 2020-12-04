@@ -3,7 +3,6 @@ package rmqclient
 import (
 	"context"
 	"fmt"
-	"time"
 )
 
 // Consumer struct
@@ -27,7 +26,7 @@ func NewConsumer(uri string, logger Logger) *Consumer {
 			err:              err,
 			ctx:              ctx,
 			notifyQuit:       cancel,
-			reconnectTimeout: time.Second * 3,
+			reconnectTimeout: reconnectTimeout,
 			logger:           logger,
 		},
 	}

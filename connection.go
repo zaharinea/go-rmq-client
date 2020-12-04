@@ -9,6 +9,8 @@ import (
 	"github.com/streadway/amqp"
 )
 
+const reconnectTimeout = 3 * time.Second
+
 // Connection struct
 type Connection struct {
 	uri              string

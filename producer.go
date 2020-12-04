@@ -2,7 +2,6 @@ package rmqclient
 
 import (
 	"context"
-	"time"
 
 	"github.com/streadway/amqp"
 )
@@ -25,7 +24,7 @@ func NewProducer(uri string, logger Logger) *Producer {
 			err:              err,
 			ctx:              ctx,
 			notifyQuit:       cancel,
-			reconnectTimeout: time.Second * 3,
+			reconnectTimeout: reconnectTimeout,
 			logger:           logger,
 		},
 	}
