@@ -1,7 +1,7 @@
 # go-rmq-client
 Simple client for rabbitmq
 
-## example usage
+## example consumer usage
 ```go
 package main
 
@@ -18,7 +18,7 @@ import (
 )
 
 func handler(ctx context.Context, msg amqp.Delivery) bool {
-	fmt.Printf("event: msg=%s", string(msg.Body))
+	fmt.Printf("event: msg=%s\n", string(msg.Body))
 	return true
 }
 
@@ -37,6 +37,45 @@ func main() {
 	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	consumer.Close()
+	consumer.Stop()
+}
+```
+
+
+## example producer usage
+```go
+package main
+
+import (
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/sirupsen/logrus"
+	rmqclient "github.com/zaharinea/go-rmq-client"
+)
+
+func main() {
+	logger := logrus.New()
+	logger.SetLevel(logrus.DebugLevel)
+	producer := rmqclient.NewProducer("amqp://guest:guest@rmq:5672/", logger)
+
+	producer.Start()
+
+	var count uint64
+	go func() {
+		for {
+			producer.Publish("exchange1", "queue1", []byte(string(count)), 0)
+			time.Sleep(time.Second * 1)
+			count++
+		}
+	}()
+
+	quit := make(chan os.Signal)
+	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	defer producer.Stop()
 }
 ```

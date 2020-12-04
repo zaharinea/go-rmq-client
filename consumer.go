@@ -2,25 +2,15 @@ package rmqclient
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
-
-	"github.com/streadway/amqp"
 )
 
 // Consumer struct
 type Consumer struct {
-	uri              string
-	conn             *amqp.Connection
-	channel          *amqp.Channel
-	queues           map[string]*Queue
-	exchanges        map[string]*Exchange
-	err              chan error
-	ctx              context.Context
-	notifyQuit       context.CancelFunc
-	reconnectTimeout time.Duration
-	logger           Logger
+	Connection
+	queues    map[string]*Queue
+	exchanges map[string]*Exchange
 }
 
 // NewConsumer returns a new Consumer struct
@@ -30,18 +20,20 @@ func NewConsumer(uri string, logger Logger) *Consumer {
 	err := make(chan error)
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Consumer{
-		uri:              uri,
-		exchanges:        exchanges,
-		queues:           queues,
-		err:              err,
-		ctx:              ctx,
-		notifyQuit:       cancel,
-		reconnectTimeout: time.Second * 3,
-		logger:           logger,
+		exchanges: exchanges,
+		queues:    queues,
+		Connection: Connection{
+			uri:              uri,
+			err:              err,
+			ctx:              ctx,
+			notifyQuit:       cancel,
+			reconnectTimeout: time.Second * 3,
+			logger:           logger,
+		},
 	}
 }
 
-//Start start consumer
+//Start start Consumer
 func (c *Consumer) Start() {
 	err := c.connect()
 	if err != nil {
@@ -69,20 +61,9 @@ func (c *Consumer) Start() {
 	}
 }
 
-//Close stop consumer
-func (c *Consumer) Close() error {
-	c.notifyQuit()
-
-	err := c.channel.Close()
-	if err != nil {
-		return err
-	}
-	err = c.conn.Close()
-	if err != nil {
-		return err
-	}
-	c.logger.Info("Closing rabbitmq channels and connection")
-	return nil
+//Stop stop Consumer
+func (c *Consumer) Stop() {
+	c.Close()
 }
 
 //RegisterQueue register queue
@@ -107,25 +88,6 @@ func (c *Consumer) RegisterExchange(exchange *Exchange) {
 	c.exchanges[exchange.Name] = exchange
 }
 
-func (c *Consumer) connect() error {
-	var err error
-	for {
-		c.logger.Info("Start connect to rabbitmq")
-		c.conn, err = amqp.Dial(c.uri)
-		if err == nil {
-			go func() {
-				<-c.conn.NotifyClose(make(chan *amqp.Error))
-				c.err <- errors.New("Connection Closed")
-			}()
-			c.logger.Info("Success connect to rabbitmq")
-			return nil
-		}
-		c.logger.Errorf("Failed connect to rabbitmq: %s", err.Error())
-		time.Sleep(c.reconnectTimeout)
-
-	}
-}
-
 func (c *Consumer) reconnect() error {
 	if err := c.connect(); err != nil {
 		return err
@@ -139,16 +101,6 @@ func (c *Consumer) reconnect() error {
 	if err := c.reconsume(); err != nil {
 		return err
 	}
-	return nil
-}
-
-func (c *Consumer) setupChanels() error {
-	var err error
-	c.channel, err = c.conn.Channel()
-	if err != nil {
-		return fmt.Errorf("Channel: %s", err)
-	}
-	c.logger.Debug("Success setup chanels to rabbitmq")
 	return nil
 }
 

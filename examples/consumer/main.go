@@ -13,7 +13,7 @@ import (
 )
 
 func handler(ctx context.Context, msg amqp.Delivery) bool {
-	fmt.Printf("event: msg=%s", string(msg.Body))
+	fmt.Printf("event: msg=%s\n", string(msg.Body))
 	return true
 }
 
@@ -43,5 +43,5 @@ func main() {
 	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	defer consumer.Close()
+	defer consumer.Stop()
 }
