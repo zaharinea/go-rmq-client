@@ -1,8 +1,3 @@
-# go-rmq-client
-Simple client for rabbitmq
-
-## example usage
-```go
 package main
 
 import (
@@ -31,12 +26,22 @@ func main() {
 	companyExchange := rmqclient.NewExchange("exchange1", "fanout", amqp.Table{}, []*rmqclient.Queue{queue1})
 	consumer.RegisterExchange(companyExchange)
 
+	queue2Failed := rmqclient.NewQueue("queue2-failed", "", amqp.Table{
+		"x-dead-letter-exchange":    "",
+		"x-dead-letter-routing-key": "queue2",
+		"x-message-ttl":             60 * 1000,
+	}).SetRequeue(false)
+	queue2 := rmqclient.NewQueue("queue2", "", amqp.Table{
+		"x-dead-letter-exchange":    "",
+		"x-dead-letter-routing-key": "queue2-failed",
+	}).SetRequeue(false).SetHandler(handler).SetCountWorkers(4)
+	consumer.RegisterQueue(queue2, queue2Failed)
+
 	consumer.Start()
 
 	quit := make(chan os.Signal)
 	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	consumer.Close()
+	defer consumer.Close()
 }
-```
