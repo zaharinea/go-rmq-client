@@ -47,8 +47,10 @@ func main() {
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -63,10 +65,12 @@ func main() {
 
 	producer.Start()
 
-	var count uint64
+	count := 0
 	go func() {
 		for {
-			producer.Publish("exchange1", "queue1", []byte(string(count)), 0)
+			message := strconv.Itoa(count)
+			fmt.Printf("Send message: %s\n", message)
+			producer.Publish("exchange1", "queue1", []byte(message), 0)
 			time.Sleep(time.Second * 1)
 			count++
 		}
