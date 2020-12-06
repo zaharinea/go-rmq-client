@@ -173,7 +173,7 @@ func (c *Consumer) reconsume() error {
 		}
 
 		if err := queue.consume(c.channel); err != nil {
-			return fmt.Errorf("Failed reconsume queue=%s after reconnect: %s", queue.Name, err)
+			return fmt.Errorf("Failed reconsume queue=%s after reconnect: %w", queue.Name, err)
 		}
 		c.logger.Debugf("Success reconsume queue=%s after reconnect", queue.Name)
 	}

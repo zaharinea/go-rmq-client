@@ -1,6 +1,11 @@
 # go-rmq-client
 Simple client for rabbitmq
 
+## installation
+```bash
+go get github.com/zaharinea/go-rmq-client
+```
+
 ## example consumer usage
 ```go
 package main

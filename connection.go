@@ -46,7 +46,7 @@ func (c *Connection) setupChanels() error {
 	var err error
 	c.channel, err = c.conn.Channel()
 	if err != nil {
-		return fmt.Errorf("Channel: %s", err)
+		return fmt.Errorf("Channel: %w", err)
 	}
 	c.logger.Debug("Success setup chanels to rabbitmq")
 	return nil

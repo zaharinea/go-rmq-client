@@ -12,6 +12,9 @@ const (
 	defaultMultiplier   = 1
 )
 
+// HandlerFunc defines the handler
+type HandlerFunc func(context.Context, amqp.Delivery) bool
+
 // Queue struct
 type Queue struct {
 	Name          string
@@ -23,7 +26,7 @@ type Queue struct {
 	Arguments     amqp.Table
 	requeue       bool
 	prefetchCount int
-	handler       func(ctx context.Context, msg amqp.Delivery) bool
+	handler       HandlerFunc
 	deliveries    chan amqp.Delivery
 	countWorkers  int
 }
@@ -47,7 +50,7 @@ func NewQueue(name string, routingKey string, arguments amqp.Table) *Queue {
 }
 
 // SetHandler register handler in Queue
-func (q *Queue) SetHandler(handler func(ctx context.Context, msg amqp.Delivery) bool) *Queue {
+func (q *Queue) SetHandler(handler HandlerFunc) *Queue {
 	q.handler = handler
 	return q
 }
@@ -74,7 +77,7 @@ func (q *Queue) SetPrefetchCount(value int) *Queue {
 func (q *Queue) declare(channel *amqp.Channel) error {
 	_, err := channel.QueueDeclare(q.Name, q.Durable, q.AutoDelete, q.Exclusive, q.NoWait, q.Arguments)
 	if err != nil {
-		return fmt.Errorf("Failed to declare a queue %s: %s", q.Name, err)
+		return fmt.Errorf("Failed to declare a queue %s: %w", q.Name, err)
 	}
 	return nil
 }
@@ -82,7 +85,7 @@ func (q *Queue) declare(channel *amqp.Channel) error {
 func (q *Queue) consume(channel *amqp.Channel) error {
 	err := channel.Qos(q.prefetchCount, 0, false)
 	if err != nil {
-		return fmt.Errorf("Error setting qos: %s", err)
+		return fmt.Errorf("Error setting qos: %w", err)
 	}
 
 	deliveries, err := channel.Consume(
@@ -95,7 +98,7 @@ func (q *Queue) consume(channel *amqp.Channel) error {
 		nil,    // args
 	)
 	if err != nil {
-		return fmt.Errorf("Queue Consume: %s", err)
+		return fmt.Errorf("Queue Consume: %w", err)
 	}
 
 	go func() {

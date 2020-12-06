@@ -34,12 +34,12 @@ func NewExchange(name string, exchangeType string, arguments amqp.Table, queues 
 
 func (e *Exchange) declareAndBind(channel *amqp.Channel) error {
 	if err := channel.ExchangeDeclare(e.Name, e.Type, e.Durable, e.AutoDelete, e.Internal, e.NoWait, e.Arguments); err != nil {
-		return fmt.Errorf("Failed to declare an exchange %s: %s", e.Name, err)
+		return fmt.Errorf("Failed to declare an exchange %s: %w", e.Name, err)
 	}
 
 	for _, queue := range e.Queues {
 		if err := channel.QueueBind(queue.Name, queue.RoutingKey, e.Name, false, nil); err != nil {
-			return fmt.Errorf("Failed to bind a queue %s to exchange %s with routing key %s: %s", queue.Name, e.Name, queue.RoutingKey, err)
+			return fmt.Errorf("Failed to bind a queue %s to exchange %s with routing key %s: %w", queue.Name, e.Name, queue.RoutingKey, err)
 		}
 	}
 	return nil
