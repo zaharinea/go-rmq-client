@@ -3,7 +3,10 @@ package rmqclient
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"sync"
+
+	"github.com/streadway/amqp"
 )
 
 // Consumer struct
@@ -180,6 +183,23 @@ func (c *Consumer) reconsume() error {
 	return nil
 }
 
+func (c *Consumer) recoveryWorker(queue *Queue, workerNumber int, delivery *amqp.Delivery) {
+	err := recover()
+	if err == nil {
+		return
+	}
+
+	c.logger.Errorf("Panic recovered: queue=%s, error=%s\n\n%s", queue.Name, err, string(debug.Stack()))
+	if err := delivery.Nack(false, queue.requeue); err != nil {
+		c.logger.Errorf("Falied nack %s", queue.Name)
+	}
+	c.logger.Debugf("Nack event: queue=%s, requeue=%v, worker=%d", queue.Name, queue.requeue, workerNumber)
+
+	// restart fallen worker
+	c.wg.Add(1)
+	go c.consumeWorker(queue, workerNumber)
+}
+
 func (c *Consumer) consumeWorker(queue *Queue, workerNumber int) {
 	defer c.wg.Done()
 
@@ -187,6 +207,8 @@ func (c *Consumer) consumeWorker(queue *Queue, workerNumber int) {
 	for {
 		select {
 		case delivery := <-queue.deliveries:
+			defer c.recoveryWorker(queue, workerNumber, &delivery)
+
 			c.logger.Debugf("Got event: queue=%s, worker=%d", queue.Name, workerNumber)
 			if queue.handler(c.ctx, delivery) {
 				if err := delivery.Ack(false); err != nil {
