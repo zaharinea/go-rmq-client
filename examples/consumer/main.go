@@ -13,8 +13,17 @@ import (
 	rmqclient "github.com/zaharinea/go-rmq-client"
 )
 
+func loggingMiddleware(handler rmqclient.HandlerFunc) rmqclient.HandlerFunc {
+	return func(ctx context.Context, msg amqp.Delivery) bool {
+		queueName := ctx.Value(rmqclient.QueueNameKey).(string)
+		fmt.Printf("start processing event: queue=%s, msg=%s\n", queueName, string(msg.Body))
+		res := handler(ctx, msg)
+		fmt.Printf("end processing event: queue=%s, msg=%s\n", queueName, string(msg.Body))
+		return res
+	}
+}
+
 func handler(ctx context.Context, msg amqp.Delivery) bool {
-	fmt.Printf("event: msg=%s\n", string(msg.Body))
 	time.Sleep(time.Second * 3)
 	return true
 }
@@ -38,6 +47,7 @@ func main() {
 		"x-dead-letter-routing-key": "queue2-failed",
 	}).SetRequeue(false).SetHandler(handler).SetCountWorkers(4)
 	consumer.RegisterQueue(queue2, queue2Failed)
+	consumer.RegisterMiddleware(loggingMiddleware)
 
 	consumer.Start()
 

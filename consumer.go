@@ -9,24 +9,35 @@ import (
 	"github.com/streadway/amqp"
 )
 
+// MiddlewareFunc defines the handler
+type MiddlewareFunc func(handler HandlerFunc) HandlerFunc
+
+type contextKey int
+
+// QueueNameKey key in context
+const QueueNameKey contextKey = 0
+
 // Consumer struct
 type Consumer struct {
 	Connection
-	queues    map[string]*Queue
-	exchanges map[string]*Exchange
-	wg        *sync.WaitGroup
+	queues      map[string]*Queue
+	exchanges   map[string]*Exchange
+	middlewares []MiddlewareFunc
+	wg          *sync.WaitGroup
 }
 
 // NewConsumer returns a new Consumer struct
 func NewConsumer(uri string, logger Logger) *Consumer {
+	middlewares := []MiddlewareFunc{}
 	exchanges := make(map[string]*Exchange)
 	queues := make(map[string]*Queue)
 	err := make(chan error)
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
 	return &Consumer{
-		exchanges: exchanges,
-		queues:    queues,
+		middlewares: middlewares,
+		exchanges:   exchanges,
+		queues:      queues,
 		Connection: Connection{
 			uri:              uri,
 			err:              err,
@@ -94,6 +105,11 @@ func (c *Consumer) RegisterExchange(exchange *Exchange) {
 		c.logger.Fatalf("Exchange already registred: %s", exchange.Name)
 	}
 	c.exchanges[exchange.Name] = exchange
+}
+
+//RegisterMiddleware register middleware
+func (c *Consumer) RegisterMiddleware(m ...MiddlewareFunc) {
+	c.middlewares = append(c.middlewares, m...)
 }
 
 func (c *Consumer) reconnect() error {
@@ -200,6 +216,15 @@ func (c *Consumer) recoveryWorker(queue *Queue, workerNumber int, delivery *amqp
 	go c.consumeWorker(queue, workerNumber)
 }
 
+func buildChain(f HandlerFunc, m ...MiddlewareFunc) HandlerFunc {
+	// if our chain is done, use the original handler func
+	if len(m) == 0 {
+		return f
+	}
+	// otherwise nest the handler funcs
+	return m[0](buildChain(f, m[1:cap(m)]...))
+}
+
 func (c *Consumer) consumeWorker(queue *Queue, workerNumber int) {
 	defer c.wg.Done()
 
@@ -209,8 +234,9 @@ func (c *Consumer) consumeWorker(queue *Queue, workerNumber int) {
 		case delivery := <-queue.deliveries:
 			defer c.recoveryWorker(queue, workerNumber, &delivery)
 
-			c.logger.Debugf("Got event: queue=%s, worker=%d", queue.Name, workerNumber)
-			if queue.handler(c.ctx, delivery) {
+			ctx := context.WithValue(c.ctx, QueueNameKey, queue.Name)
+			result := buildChain(queue.handler, c.middlewares...)(ctx, delivery)
+			if result {
 				if err := delivery.Ack(false); err != nil {
 					c.logger.Errorf("Falied ack %s", queue.Name)
 				}
